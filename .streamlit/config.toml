@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#4F46E5"         # Indigo
+backgroundColor = "#020617"      # Very dark slate
+secondaryBackgroundColor = "#020617"
+textColor = "#E5E7EB"            # Light gray
+font = "sans serif"

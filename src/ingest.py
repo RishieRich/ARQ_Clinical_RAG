@@ -1,6 +1,7 @@
-# High-level ingestion script that chunks PDFs and writes them into Chroma
-# with Ollama embeddings.
-from pathlib import Path  # Path utility for filesystem navigation
+"""Ingestion script that chunks PDFs and loads them into Chroma with logging."""
+
+import logging
+from pathlib import Path
 
 import chromadb  # Vector database client used for persistence and search
 from chromadb.utils import embedding_functions  # Helpers for embedding backends
@@ -8,8 +9,13 @@ from chromadb.utils import embedding_functions  # Helpers for embedding backends
 # Reuse the PDF extraction and chunking helpers from the shared utils
 from text_utils import extract_text_from_pdf, chunk_text
 
+# Consistent logging so CLI runs emit the same detail.
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+logger = logging.getLogger(__name__)
+
 # Resolve the project root (.../clinical_rag) relative to this file
-BASE_DIR = Path(__file__).resolve().parents[1]  # .../clinical_rag
+BASE_DIR = Path(__file__).resolve().parents[1]
 # Folder containing the source PDF documents to ingest
 PDF_DIR = BASE_DIR / "data" / "pdfs"
 # Folder where the Chroma persistent database will live
@@ -24,7 +30,8 @@ OVERLAP = 200  # Characters of overlap between adjacent chunks
 
 
 def build_client_and_collection():
-    # Create a Chroma client that persists its data under CHROMA_DIR
+    """Create a Chroma client and collection configured with Ollama embeddings."""
+    logger.info("Connecting to Chroma at %s", CHROMA_DIR)
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
 
     # Configure an embedding function that calls the local Ollama server
@@ -38,28 +45,22 @@ def build_client_and_collection():
         name=COLLECTION_NAME,
         embedding_function=ollama_ef,
     )
-    # Return both client and collection for downstream use
+    logger.info("Collection '%s' ready with %s documents", COLLECTION_NAME, collection.count())
     return client, collection
 
 
 def ingest_pdfs():
-    # Ensure the PDF directory exists before attempting ingestion
+    """Read all PDFs in PDF_DIR, chunk them, and add chunks to Chroma."""
     if not PDF_DIR.exists():
-        print(f"!! PDF directory not found: {PDF_DIR}")
+        logger.error("PDF directory not found: %s", PDF_DIR)
         return
 
-    # Collect all PDF files, sorted for consistent ordering
-    pdf_files = sorted(PDF_DIR.glob("*.pdf"))
-    # Bail out early if no PDFs are available
+    pdf_files = sorted(PDF_DIR.glob("*.pdf"))  # Collect all PDF files, sorted for consistent ordering
     if not pdf_files:
-        print(f"!! No PDFs found in {PDF_DIR}")
+        logger.warning("No PDFs found in %s", PDF_DIR)
         return
 
-    # Announce which files will be processed
-    print(f"-> Found {len(pdf_files)} PDF(s):")
-    for f in pdf_files:
-        print(f"   - {f.name}")
-    print()
+    logger.info("Found %s PDF(s): %s", len(pdf_files), ", ".join(f.name for f in pdf_files))
 
     # Prepare Chroma client and collection for ingestion
     client, collection = build_client_and_collection()
@@ -69,55 +70,44 @@ def ingest_pdfs():
 
     # Process each PDF file one by one
     for pdf_path in pdf_files:
-        # Visual separator for per-file output
-        print("=" * 80)
-        # Indicate which PDF is currently being handled
-        print(f"-> Processing: {pdf_path.name}")
+        logger.info("Processing: %s", pdf_path.name)
 
         # Extract raw text from the PDF
         text = extract_text_from_pdf(pdf_path)
-        # Report how many characters were extracted
-        print(f"   + extracted {len(text)} characters")
+        logger.info("Extracted %s characters from %s", len(text), pdf_path.name)
 
         # Convert the text into overlapping chunks
         chunks = chunk_text(text, chunk_size=CHUNK_SIZE, overlap=OVERLAP)
-        # Report how many chunks were produced
-        print(f"   + created {len(chunks)} chunks")
+        logger.info("Created %s chunks from %s", len(chunks), pdf_path.name)
 
         # Build IDs, documents, and metadata entries for each chunk
         for idx, chunk in enumerate(chunks):
-            # Unique ID combines the PDF stem and chunk index
-            cid = f"{pdf_path.stem}_{idx}"
-            # Metadata describing the source and position of the chunk
+            cid = f"{pdf_path.stem}_{idx}"  # Unique ID combines the PDF stem and chunk index
             meta = {
                 "source": pdf_path.name,
                 "chunk_index": idx,
             }
-            # Append the current chunk's data to the accumulators
             all_ids.append(cid)
             all_docs.append(chunk)
             all_metas.append(meta)
 
     # If nothing was produced (e.g., PDFs were empty), exit gracefully
     if not all_docs:
-        print("!! No chunks to add")
+        logger.warning("No chunks to add; exiting without modifying Chroma")
         return
 
     # Send all accumulated chunks to the Chroma collection (triggers embedding)
-    print("\n-> Adding chunks to Chroma (this calls Ollama for embeddings)...")
+    logger.info("Adding %s chunks to Chroma (this calls Ollama for embeddings)...", len(all_docs))
     collection.add(ids=all_ids, documents=all_docs, metadatas=all_metas)
-    # Confirm ingestion completion
-    print("✓ Ingestion complete.")
 
-    # Report the final document count in the collection
-    print(f"-> Collection '{COLLECTION_NAME}' now has {collection.count()} documents.")
+    logger.info("Ingestion complete.")
+    logger.info("Collection '%s' now has %s documents.", COLLECTION_NAME, collection.count())
 
 
 def main():
-    # Entry point for running ingestion directly
+    """Entry point for running ingestion directly."""
     ingest_pdfs()
 
 
 if __name__ == "__main__":
-    # Only run ingestion when the script is executed as the main module
     main()

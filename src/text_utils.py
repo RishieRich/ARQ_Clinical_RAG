@@ -1,72 +1,63 @@
-# Standard library path helper for resolving project directories
+"""Shared text utilities for PDF experiments with detailed logging."""
+
+import logging
 from pathlib import Path
-# Import PDF text extraction and chunking utilities from the sibling module
+
 from chunk_playground import extract_text_from_pdf, chunk_text
 
+# Align logging with the rest of the project so outputs are uniform.
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+logger = logging.getLogger(__name__)
+
 # Resolve the repository root (.../clinical_rag) from this file's location
-BASE_DIR = Path(__file__).resolve().parents[1]   # .../clinical_rag
+BASE_DIR = Path(__file__).resolve().parents[1]
 # Point to the folder containing PDF files used for experimentation
 PDF_DIR = BASE_DIR / "data" / "pdfs"
 
 
 def show_chunks_for_config(pdf_path: Path, chunk_size: int, overlap: int):
-    # Print a separator for readability in the console output
-    print("=" * 80)
-    # Indicate which PDF is being processed
-    print(f"File: {pdf_path.name}")
-    # Display the chunking configuration parameters being tested
-    print(f"Config: chunk_size={chunk_size}, overlap={overlap}")
+    """Display chunking stats and sample chunks for the given configuration."""
+    logger.info("=" * 80)
+    logger.info("File: %s", pdf_path.name)
+    logger.info("Config: chunk_size=%s, overlap=%s", chunk_size, overlap)
 
-    # Extract the full text from the provided PDF
     text = extract_text_from_pdf(pdf_path)
-    # Break the text into overlapping chunks using the provided configuration
     chunks = chunk_text(text, chunk_size=chunk_size, overlap=overlap)
 
-    # Report total character count for the extracted text
-    print(f"Total characters: {len(text)}")
-    # Report how many chunks were produced
-    print(f"Number of chunks: {len(chunks)}")
-    # If no chunks were created, exit early
+    logger.info("Total characters: %s", len(text))
+    logger.info("Number of chunks: %s", len(chunks))
     if not chunks:
+        logger.warning("No chunks produced for %s", pdf_path.name)
         return
 
-    # Show the first two chunks to inspect boundary behavior
     for i, ch in enumerate(chunks[:2]):
-        # Separator between displayed chunks
-        print("-" * 40)
-        # Identify the chunk index and its length
-        print(f"Chunk {i} (len={len(ch)}):")
-        # Print the first 600 characters, with visible newlines
-        print(ch[:600].replace("\n", "\\n\n"))
-        # Indicate that the chunk preview is truncated
-        print("\n[...]")
-    # Add an extra blank line after processing
-    print()
+        logger.info("-" * 40)
+        logger.info("Chunk %s (len=%s):", i, len(ch))
+        logger.info("%s", ch[:600].replace("\n", "\\n\n"))
+        logger.info("[...]")
+    logger.info("")  # Blank line for readability
 
 
 def main():
-    # Collect all PDF files in the target directory, sorted for consistency
+    """Run chunk inspection across a small set of configurations."""
     pdf_files = sorted(PDF_DIR.glob("*.pdf"))
-    # If no PDFs are found, notify the user and exit
     if not pdf_files:
-        print(f"No PDFs found in {PDF_DIR}")
+        logger.warning("No PDFs found in %s", PDF_DIR)
         return
 
-    # Choose the first PDF as the default target (adjust as needed)
-    target_pdf = pdf_files[0]  # or choose by name/index
+    target_pdf = pdf_files[0]  # Choose the first PDF as the default target
+    logger.info("Using target PDF: %s", target_pdf.name)
 
-    # Define several chunking configurations to experiment with
     configs = [
         (800, 200),
         (1200, 200),
         (1600, 300),
     ]
 
-    # Run the chunk display helper for each configuration
     for cs, ov in configs:
         show_chunks_for_config(target_pdf, cs, ov)
 
 
 if __name__ == "__main__":
-    # Execute the script when run directly from the command line
     main()
