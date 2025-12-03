@@ -5,4 +5,3 @@ pypdf
 python-dotenv
 google-generativeai
 langchain
-pandas
