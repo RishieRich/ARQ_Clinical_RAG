@@ -5,3 +5,4 @@ pypdf
 python-dotenv
 google-generativeai
 langchain
+numpy 
