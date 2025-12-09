@@ -146,8 +146,8 @@ def answer_question(
     5. Return (answer, chunks_used).
     """
     # --- 1. Retrieve relevant chunks from Chroma ---
-    retriever = vectordb.as_retriever(search_kwargs={"k": k})
-    source_docs: List[Document] = retriever.get_relevant_documents(question)
+    # Newer LangChain: just call similarity_search on the vector store.
+    source_docs: List[Document] = vectordb.similarity_search(question, k=k)
 
     if not source_docs:
         return "I could not find relevant context for this question.", []
@@ -178,7 +178,6 @@ Answer in 3–5 concise sentences:
     # --- 4. Call Ollama LLM directly ---
     llm = Ollama(model=CHAT_MODEL)
 
-    # Newer LangChain returns a BaseMessage or plain str depending on integration.
     raw_response = llm.invoke(prompt)
 
     # Normalise to text
