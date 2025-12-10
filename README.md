@@ -1,4 +1,6 @@
 # Clinical RAG Copilot
+<img width="1536" height="1024" alt="20251210_2350_Clinical RAG Copilot Display_simple_compose_01kc4qrkndez8t51661f60sn25" src="https://github.com/user-attachments/assets/e20e97a3-73b8-4bac-8b0a-ed44003fc8b7" />
+
 
 A local-first Retrieval Augmented Generation (RAG) playground for clinical guidelines. The project ingests guideline PDFs into a Chroma vector store (embedded with Ollama), then serves a Streamlit chat UI and small CLI utilities for debugging retrieval quality.
 
